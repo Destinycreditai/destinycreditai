@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     let user = await prisma.user.findFirst({ where: { email: 'demo@example.com' } });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: 'demo@example.com', role: 'user' }
+        data: { email: 'demo@example.com', role: 'USER' }
       });
     }
     
