@@ -1,26 +1,230 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --primary-black: #0B0B0B;
+  --primary-green: #009933;
+  --pure-white: #FFFFFF;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--pure-white);
+  color: var(--primary-black);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+}
+
+button {
+  background-color: var(--primary-green);
+  color: var(--pure-white);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+}
+
+button:hover {
+  background-color: #007a29;
+}
+
+.card {
+  background-color: var(--pure-white);
+  border: 1px solid #e5e5e5;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+/* Global rule: Any text on green background must be white - ADMIN PANEL SPECIFIC */
+.bg-green-600,
+.bg-green-700,
+.bg-primary-green,
+[class*="bg-green-600"],
+[class*="bg-green-700"] {
+  color: #ffffff !important;
+}
+
+/* Force all child elements in green blocks to be white - including emojis and icons */
+.bg-green-600 *,
+.bg-green-600 h1,
+.bg-green-600 h2,
+.bg-green-600 h3,
+.bg-green-600 h4,
+.bg-green-600 h5,
+.bg-green-600 h6,
+.bg-green-600 span,
+.bg-green-600 div,
+.bg-green-600 p,
+.bg-green-600 em,
+.bg-green-600 strong,
+.bg-green-600 i,
+.bg-green-600 b,
+.bg-green-600::before,
+.bg-green-600::after,
+.bg-green-700 *,
+.bg-green-700 h1,
+.bg-green-700 h2,
+.bg-green-700 h3,
+.bg-green-700 h4,
+.bg-green-700 h5,
+.bg-green-700 h6,
+.bg-green-700 span,
+.bg-green-700 div,
+.bg-green-700 p,
+.bg-green-700 em,
+.bg-green-700 strong,
+.bg-green-700 i,
+.bg-green-700 b,
+.bg-green-700::before,
+.bg-green-700::after,
+.bg-primary-green *,
+.bg-primary-green h1,
+.bg-primary-green h2,
+.bg-primary-green h3,
+.bg-primary-green h4,
+.bg-primary-green h5,
+.bg-primary-green h6,
+.bg-primary-green span,
+.bg-primary-green div,
+.bg-primary-green p,
+.bg-primary-green em,
+.bg-primary-green strong,
+.bg-primary-green i,
+.bg-primary-green b,
+.bg-primary-green::before,
+.bg-primary-green::after,
+[class*="bg-green-600"] *,
+[class*="bg-green-600"] h1,
+[class*="bg-green-600"] h2,
+[class*="bg-green-600"] h3,
+[class*="bg-green-600"] span,
+[class*="bg-green-600"] div,
+[class*="bg-green-600"] p,
+[class*="bg-green-700"] *,
+[class*="bg-green-700"] h1,
+[class*="bg-green-700"] h2,
+[class*="bg-green-700"] h3,
+[class*="bg-green-700"] span,
+[class*="bg-green-700"] div,
+[class*="bg-green-700"] p {
+  color: #ffffff !important;
+}
+
+/* Ensure buttons with green backgrounds have white text */
+button.bg-green-600, button.bg-green-700, button.bg-primary-green {
+  color: white !important;
+}
+
+button.bg-green-600:hover, button.bg-green-700:hover, button.bg-primary-green:hover {
+  color: white !important;
+}
+
+.admin-green-btn {
+  background-color: #16a34a !important; /* green-600 */
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.admin-green-btn,
+.admin-green-btn *,
+.admin-green-btn span,
+.admin-green-btn div,
+.admin-green-btn p,
+.admin-green-btn h1,
+.admin-green-btn h2,
+.admin-green-btn h3,
+.admin-green-btn h4,
+.admin-green-btn h5,
+.admin-green-btn h6 {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.admin-green-btn:hover {
+  background-color: #15803d !important; /* green-700 */
+  color: #ffffff !important;
+}
+
+.admin-green-btn:hover,
+.admin-green-btn:hover *,
+.admin-green-btn:hover span,
+.admin-green-btn:hover div {
+  color: #ffffff !important;
+}
+
+/* Ensure all green buttons in admin panel have white text */
+.bg-green-600 button,
+.bg-green-600 .button,
+.bg-primary-green button,
+.bg-primary-green .button,
+[class*="bg-green"] button,
+[class*="bg-green"] .button {
+  color: #ffffff !important;
+}
+
+/* Ensure text in green containers is white - override all Tailwind text colors */
+.bg-green-600,
+.bg-green-700,
+.bg-primary-green,
+[class*="bg-green-600"],
+[class*="bg-green-700"] {
+  color: #ffffff !important;
+}
+
+.bg-green-600 *:not(button):not(.text-red):not(.text-gray):not(.text-red-800):not(.text-gray-800),
+.bg-green-700 *:not(button):not(.text-red):not(.text-gray):not(.text-red-800):not(.text-gray-800),
+.bg-primary-green *:not(button):not(.text-red):not(.text-gray):not(.text-red-800):not(.text-gray-800) {
+  color: #ffffff !important;
+}
+
+/* Admin Panel: Force white text on all green background blocks - override any Tailwind text classes */
+div.bg-green-600,
+div.bg-green-700,
+div.bg-primary-green,
+div[class*="bg-green-600"],
+div[class*="bg-green-700"] {
+  color: #ffffff !important;
+}
+
+div.bg-green-600 *,
+div.bg-green-600 h1,
+div.bg-green-600 h2,
+div.bg-green-600 h3,
+div.bg-green-600 h4,
+div.bg-green-600 h5,
+div.bg-green-600 h6,
+div.bg-green-600 span,
+div.bg-green-600 div,
+div.bg-green-600 p,
+div.bg-green-700 *,
+div.bg-green-700 h1,
+div.bg-green-700 h2,
+div.bg-green-700 h3,
+div.bg-green-700 h4,
+div.bg-green-700 h5,
+div.bg-green-700 h6,
+div.bg-green-700 span,
+div.bg-green-700 div,
+div.bg-green-700 p,
+div.bg-primary-green *,
+div.bg-primary-green h1,
+div.bg-primary-green h2,
+div.bg-primary-green h3,
+div.bg-primary-green h4,
+div.bg-primary-green h5,
+div.bg-primary-green h6,
+div.bg-primary-green span,
+div.bg-primary-green div,
+div.bg-primary-green p {
+  color: #ffffff !important;
+}
+
+/* Force white text on admin-green-btn even with other classes */
+.admin-green-btn.text-white,
+.admin-green-btn .text-white,
+button.admin-green-btn,
+button.admin-green-btn * {
+  color: #ffffff !important;
 }

@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  try {
+    const letters = await prisma.followUpLetter.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { name: true, email: true } } }
+    });
+    return NextResponse.json({ success: true, data: letters });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { userId, day, content } = await request.json();
+    
+    // Validate required fields
+    if (!content) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Content is required' 
+      }, { status: 400 });
+    }
+    
+    if (!day || ![15, 30, 45].includes(day)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Day must be 15, 30, or 45' 
+      }, { status: 400 });
+    }
+    
+    // Ensure user exists or create default user
+    let user = await prisma.user.findFirst({ where: { email: 'demo@example.com' } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { name: 'Demo User', email: 'demo@example.com', role: 'USER' }
+      });
+    }
+    
+    // Use existing user or verify provided userId exists
+    let finalUserId = user.id;
+    if (userId) {
+      const existingUser = await prisma.user.findUnique({ where: { id: String(userId) } });
+      if (existingUser) {
+        finalUserId = existingUser.id;
+      }
+    }
+    
+    const letter = await prisma.followUpLetter.create({
+      data: {
+        userId: finalUserId,
+        day: Number(day),
+        content
+      }
+    });
+    
+    return NextResponse.json({ success: true, data: letter });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+  }
+}

@@ -1,0 +1,56 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  try {
+    const workflows = await prisma.workflow.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return NextResponse.json({ success: true, data: workflows });
+  } catch (error) {
+    console.error('Error fetching workflows:', error);
+    return NextResponse.json({ success: false, error: 'Failed to fetch workflows' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { name, steps, enabled = true } = body;
+    
+    // Validate required fields
+    if (!name) {
+      return NextResponse.json({ success: false, error: 'Workflow name is required' }, { status: 400 });
+    }
+    
+    // Validate steps format
+    let parsedSteps = { steps: [] };
+    if (steps) {
+      if (typeof steps === 'string') {
+        try {
+          parsedSteps = JSON.parse(steps);
+          // Ensure steps has the correct structure
+          if (!parsedSteps.steps || !Array.isArray(parsedSteps.steps)) {
+            parsedSteps = { steps: [] };
+          }
+        } catch (e) {
+          return NextResponse.json({ success: false, error: 'Invalid JSON in steps field. Expected format: {"steps": ["Step 1", "Step 2"]}' }, { status: 400 });
+        }
+      } else {
+        parsedSteps = steps;
+        // Ensure steps has the correct structure
+        if (!parsedSteps.steps || !Array.isArray(parsedSteps.steps)) {
+          parsedSteps = { steps: [] };
+        }
+      }
+    }
+    
+    const workflow = await prisma.workflow.create({
+      data: { name, steps: parsedSteps, enabled }
+    });
+    
+    return NextResponse.json({ success: true, data: workflow });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+  }
+}
