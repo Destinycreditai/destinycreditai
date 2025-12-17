@@ -1,31 +1,43 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-// GET request
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  const { id } = await context.params; // type-safe fix
-  // aapka existing GET logic yahan rahega
-  return NextResponse.json({ message: `Feature toggle ${id}` });
-}
-
-// PATCH request
 export async function PATCH(
-  req: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
-  // aapka existing PATCH logic yahan rahega
-  return NextResponse.json({ success: true });
-}
+  try {
+    // ✅ NEW: params must be awaited
+    const { id } = await context.params;
 
-// DELETE request
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  const { id } = await context.params;
-  // aapka existing DELETE logic yahan rahega
-  return NextResponse.json({ success: true });
+    const body = await request.json();
+
+    if (typeof body.enabled !== "boolean") {
+      return NextResponse.json(
+        { success: false, error: "Invalid 'enabled' value" },
+        { status: 400 }
+      );
+    }
+
+    const updatedToggle = await prisma.featureToggle.update({
+      where: { id },
+      data: {
+        enabled: body.enabled
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updatedToggle
+    });
+  } catch (error: any) {
+    console.error("Feature toggle PATCH error:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message ?? "Failed to update feature toggle"
+      },
+      { status: 500 }
+    );
+  }
 }
