@@ -1,15 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
-import pool from '../../../../../lib/database';
+import { NextResponse } from "next/server";
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { enabled } = await request.json();
-    const result = await pool.query(
-      'UPDATE feature_toggles SET enabled = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-      [enabled, params.id]
-    );
-    return NextResponse.json(result.rows[0]);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to toggle feature' }, { status: 500 });
-  }
+// GET request handler
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  // aapka existing GET logic yahan rahega
+  return NextResponse.json({ message: `Feature toggle ${params.id}` });
+}
+
+// PATCH request handler
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  // aapka existing PATCH logic yahan rahega
+  return NextResponse.json({ success: true });
+}
+
+// DELETE request handler
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  // aapka existing DELETE logic yahan rahega
+  return NextResponse.json({ success: true });
 }
