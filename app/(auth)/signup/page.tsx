@@ -30,10 +30,10 @@ export default function SignupPage() {
                 throw new Error(data.error || 'Signup failed');
             }
 
-            router.push('/dashboard');
+            // Use window.location for full page reload to ensure cookie is set
+            window.location.href = '/dashboard';
         } catch (err: any) {
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };

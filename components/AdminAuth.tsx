@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface AdminAuthProps {
   children: React.ReactNode;
@@ -8,9 +9,31 @@ interface AdminAuthProps {
 
 export default function AdminAuth({ children }: AdminAuthProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user && data.user.role === 'ADMIN') {
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (err) {
+        console.error('Auth check failed', err);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +72,17 @@ export default function AdminAuth({ children }: AdminAuthProps) {
     await fetch('/api/auth/logout', { method: 'POST' });
     setIsAuthenticated(false);
     setCredentials({ email: '', password: '' });
+    router.push('/login');
   };
+
+  // Show loading state while checking auth
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-pure-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

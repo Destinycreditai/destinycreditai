@@ -17,22 +17,36 @@ export default function LoginPage() {
         setError('');
 
         try {
+            console.log('🔐 Login attempt started...');
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
+                credentials: 'include', // Ensure cookies are included
             });
 
             const data = await res.json();
+            console.log('📥 Login response:', { ok: res.ok, status: res.status, data });
 
             if (!res.ok) {
                 throw new Error(data.error || 'Login failed');
             }
 
-            router.push('/dashboard');
+            console.log('✅ Login successful! Redirecting to:', data.user.role === 'ADMIN' ? '/admin' : '/dashboard');
+            
+            // Small delay to ensure cookie is set, then do full page reload
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Use window.location for full page reload to ensure cookie is set
+            // This prevents middleware redirect issues
+            if (data.user.role === 'ADMIN') {
+                window.location.href = '/admin';
+            } else {
+                window.location.href = '/dashboard';
+            }
         } catch (err: any) {
+            console.error('❌ Login error:', err);
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };

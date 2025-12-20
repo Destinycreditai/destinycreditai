@@ -6,6 +6,7 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT NOT NULL,
+    "username" TEXT,
     "password" TEXT,
     "role" "Role" NOT NULL DEFAULT 'USER',
     "active" BOOLEAN NOT NULL DEFAULT true,
@@ -76,17 +77,6 @@ CREATE TABLE "AIPrompt" (
 );
 
 -- CreateTable
-CREATE TABLE "LetterTemplate" (
-    "id" TEXT NOT NULL,
-    "category" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "disclaimer" TEXT,
-    "enabled" BOOLEAN NOT NULL DEFAULT true,
-
-    CONSTRAINT "LetterTemplate_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Disclaimer" (
     "id" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -108,8 +98,25 @@ CREATE TABLE "ResourceLink" (
     CONSTRAINT "ResourceLink_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "feature_toggles" (
+    "id" TEXT NOT NULL,
+    "feature_name" TEXT NOT NULL,
+    "enabled" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "feature_toggles_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "feature_toggles_feature_name_key" ON "feature_toggles"("feature_name");
 
 -- AddForeignKey
 ALTER TABLE "CreditLetter" ADD CONSTRAINT "CreditLetter_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

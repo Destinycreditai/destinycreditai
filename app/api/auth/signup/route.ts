@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, signToken } from '@/lib/auth';
-import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
     try {
@@ -30,17 +29,10 @@ export async function POST(request: Request) {
         });
 
         // Create session token
-        const token = signToken({ userId: user.id, email: user.email, role: user.role });
+        const token = await signToken({ userId: user.id, email: user.email, role: user.role });
 
-        // Set cookie
-        (await cookies()).set('auth_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 60 * 60 * 24 * 7, // 1 week
-            path: '/',
-        });
-
-        return NextResponse.json({
+        // Create response first
+        const response = NextResponse.json({
             user: {
                 id: user.id,
                 email: user.email,
@@ -48,6 +40,17 @@ export async function POST(request: Request) {
                 role: user.role,
             },
         });
+
+        // Set cookie on response
+        response.cookies.set('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 60 * 60 * 24 * 7, // 1 week
+            path: '/',
+            sameSite: 'lax',
+        });
+
+        return response;
     } catch (error) {
         console.error('Signup error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
