@@ -88,10 +88,13 @@ export default function CreditVideos() {
                                             className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-primary-green transition-all overflow-hidden"
                                         >
                                             <div className="aspect-video bg-gray-100 flex items-center justify-center relative">
-                                                {link.url.includes('youtube.com') || link.url.includes('youtu.be') ? (
+                                                {link.url.includes('youtube.com') || link.url.includes('youtu.be') || link.url.includes('loom.com') ? (
                                                     <iframe
                                                         className="w-full h-full"
-                                                        src={link.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                                                        src={link.url
+                                                          .replace('watch?v=', 'embed/')
+                                                          .replace('youtu.be/', 'youtube.com/embed/')
+                                                          .replace('loom.com/share/', 'loom.com/embed/')}
                                                         title={link.title}
                                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                                         allowFullScreen

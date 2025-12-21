@@ -726,7 +726,10 @@ EDUCATIONAL DISCLAIMER: This template is for educational purposes only. No legal
             <div className="bg-white p-2 rounded-xl shadow-lg border border-gray-100 overflow-hidden aspect-video">
               <iframe
                 className="w-full h-full rounded-lg"
-                src={guidanceVideo.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                src={guidanceVideo.url
+                  .replace('watch?v=', 'embed/')
+                  .replace('youtu.be/', 'youtube.com/embed/')
+                  .replace('loom.com/share/', 'loom.com/embed/')}
                 title="Guidance Video"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
