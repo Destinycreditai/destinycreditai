@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, access } from 'fs/promises';
 import path from 'path';
-//hannan
+
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
@@ -32,6 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid file type. Only PDF and Images allowed' }, { status: 400 });
     }
 
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: 'File size exceeds 10MB limit' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const filename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
     const uniqueFilename = `${Date.now()}_${filename}`;
@@ -40,12 +45,20 @@ export async function POST(request: NextRequest) {
     const uploadDir = path.join(process.cwd(), 'public/uploads');
     try {
       await mkdir(uploadDir, { recursive: true });
+      // Check if directory is writable
+      await access(uploadDir);
     } catch (e) {
-      // Ignore error if it exists
+      console.error('Error creating/accessing upload directory:', e);
+      return NextResponse.json({ success: false, error: 'Upload directory error. Please contact administrator.' }, { status: 500 });
     }
 
     const filepath = path.join(uploadDir, uniqueFilename);
-    await writeFile(filepath, buffer);
+    try {
+      await writeFile(filepath, buffer);
+    } catch (writeError) {
+      console.error('Error writing file:', writeError);
+      return NextResponse.json({ success: false, error: 'Failed to save file. Check disk space and permissions.' }, { status: 500 });
+    }
 
     // Public URL path
     const publicPath = `/uploads/${uniqueFilename}`;
@@ -63,6 +76,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Upload error:', error);
+    // Provide more specific error messages for debugging
+    if (error instanceof TypeError && error.message.includes('ReadableStream')) {
+      return NextResponse.json({ success: false, error: 'File processing error. Please try a different file.' }, { status: 500 });
+    }
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }

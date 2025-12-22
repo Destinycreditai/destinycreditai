@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, access } from 'fs/promises';
 import path from 'path';
 
 export async function GET() {
@@ -54,22 +54,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Physical file storage
+    // Validate file type (allow images and PDFs)
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ success: false, error: 'Invalid file type. Only PDF and Images allowed' }, { status: 400 });
+    }
+
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: 'File size exceeds 10MB limit' }, { status: 400 });
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
     const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
 
-    // Ensure directory exists
+    // Ensure upload directory exists
     try {
       await mkdir(uploadDir, { recursive: true });
+      // Check if directory is writable
+      await access(uploadDir);
     } catch (e) {
-      // Ignore if exists
+      console.error('Error creating/accessing upload directory:', e);
+      return NextResponse.json({ success: false, error: 'Upload directory error. Please contact administrator.' }, { status: 500 });
     }
 
     const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
+    try {
+      await writeFile(filepath, buffer);
+    } catch (writeError) {
+      console.error('Error writing file:', writeError);
+      return NextResponse.json({ success: false, error: 'Failed to save file. Check disk space and permissions.' }, { status: 500 });
+    }
 
     const publicPath = `/uploads/${filename}`;
 
@@ -85,6 +103,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: upload });
   } catch (error) {
     console.error('Upload error:', error);
+    // Provide more specific error messages for debugging
+    if (error instanceof TypeError && error.message.includes('ReadableStream')) {
+      return NextResponse.json({ success: false, error: 'File processing error. Please try a different file.' }, { status: 500 });
+    }
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
