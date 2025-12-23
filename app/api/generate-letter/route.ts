@@ -6,7 +6,8 @@ import { verifyToken } from '@/lib/auth';
 import { readFile, unlink } from 'fs/promises';
 import { appendFileSync } from 'fs';
 import path from 'path';
-import { deleteTempFile } from '@/lib/tempFileUtils';
+
+// Note: We're not using deleteTempFile since we're not storing files on the server
 
 const DEBUG_LOG = path.join(process.cwd(), 'debug_api.log');
 function logDebug(msg: string) {
@@ -20,7 +21,6 @@ function logDebug(msg: string) {
 
 // Moved inside to avoid potential top-level initialization issues
 let openai: OpenAI;
-let pdf: any;
 
 export const maxDuration = 300; // 5 minutes max duration for the route
 
@@ -69,8 +69,7 @@ export async function POST(request: NextRequest) {
       disputeReason,
       bureau,
       letterType,
-      documentContent, // Direct content from temporary files
-      documentPaths, // Temporary file paths to be cleaned up
+      documentContent, // Direct content from client-side
       fullSystemPrompt // Optional override
     } = body;
 
@@ -187,18 +186,8 @@ ${documentContent}
     });
     logDebug(`Letter saved successfully (took ${Date.now() - startSave}ms)`);
 
-    // Clean up temporary files after processing
-    if (documentPaths && Array.isArray(documentPaths)) {
-      for (const tempPath of documentPaths) {
-        try {
-          await deleteTempFile(tempPath);
-          logDebug(`Temporary file cleaned up: ${tempPath}`);
-        } catch (cleanupError) {
-          console.error(`Error cleaning up temporary file ${tempPath}:`, cleanupError);
-          // Don't fail the request if cleanup fails
-        }
-      }
-    }
+    // No file cleanup needed since we're not storing files on the server
+    // The file content is sent directly from the client
 
     return NextResponse.json({
       success: true,
