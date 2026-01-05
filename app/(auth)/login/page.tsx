@@ -25,6 +25,13 @@ export default function LoginPage() {
                 credentials: 'include', // Ensure cookies are included
             });
 
+            // Check if response is JSON before parsing
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                console.error('❌ Response is not JSON:', await res.text());
+                throw new Error('Server returned unexpected response format');
+            }
+            
             const data = await res.json();
             console.log('📥 Login response:', { ok: res.ok, status: res.status, data });
 

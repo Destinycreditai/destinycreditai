@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password } = body;
 
+    console.log('✅✅ Login API Hit! Parameters:', { email });
     console.log('🔐 Login attempt for:', email);
 
     // Validate input - EMAIL and PASSWORD only
@@ -22,11 +23,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Query user by EMAIL only with active check
+    // Query user by EMAIL only - using select to avoid field mismatch issues
     const user = await prisma.user.findFirst({
       where: {
         email,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        password: true,
+        role: true,
         active: true,
+        // Only select fields that exist in both schemas
       },
     });
 
@@ -39,8 +48,167 @@ export async function POST(request: Request) {
       );
     }
 
+    // HARD ADMIN BYPASS: ADMIN users bypass all subscription checks
+    if (user.role === 'ADMIN') {
+      console.log('👑 Admin user login - HARD BYPASS enabled, skipping all subscription checks:', email);
+
+      // Only validate password for admin
+      if (!user.password || user.password.trim() === '') {
+        console.log('❌ Admin user has no password:', email);
+        return NextResponse.json(
+          { error: 'Invalid credentials' },
+          { status: 401 }
+        );
+      }
+
+      // Validate password for admin
+      let isValid = false;
+      try {
+        isValid = await bcrypt.compare(password, user.password);
+      } catch (bcryptError) {
+        console.error('❌ bcrypt error for admin:', bcryptError);
+        return NextResponse.json(
+          { error: 'Invalid credentials' },
+          { status: 401 }
+        );
+      }
+
+      if (!isValid) {
+        console.log('❌ Invalid password for admin:', email);
+        return NextResponse.json(
+          { error: 'Invalid credentials' },
+          { status: 401 }
+        );
+      }
+
+      // Update last login for admin
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLogin: new Date() },
+        });
+      } catch (updateError) {
+        console.error('⚠️ Failed to update lastLogin for admin:', updateError);
+        // Continue with login even if update fails
+      }
+
+      // Generate token for admin
+      let jwtSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+      if (!jwtSecret) {
+        console.error('❌ CRITICAL: JWT_SECRET or NEXTAUTH_SECRET is not configured');
+        
+        // Use a fallback secret for development (not recommended for production)
+        if (process.env.NODE_ENV !== 'production') {
+          jwtSecret = 'fallback-jwt-secret-key-change-me-in-production';
+          console.warn('⚠️ Using fallback JWT secret - this should only be used in development');
+        } else {
+          return NextResponse.json(
+            { error: 'Server configuration error - JWT secret not configured' },
+            { status: 500 }
+          );
+        }
+      }
+
+      let token: string;
+      try {
+        token = jwt.sign(
+          {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            hasValidSubscription: true, // Admins always have valid subscription
+          },
+          jwtSecret,
+          { expiresIn: '7d' }
+        );
+      } catch (jwtError) {
+        console.error('❌ JWT signing error for admin:', jwtError);
+        return NextResponse.json(
+          { error: 'Failed to create session' },
+          { status: 500 }
+        );
+      }
+
+      // Return immediately for admin
+      const response = NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          hasValidSubscription: true, // Admins always have valid subscription
+        },
+      });
+
+      // Set auth cookie
+      response.cookies.set({
+        name: 'auth_token',
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Only secure in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for production, 'lax' for development
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+
+      console.log('✅ Admin login successful for:', email);
+      return response;
+    }
+
+    // For USER role, check subscription requirements
+    // Query the full user object to access new fields (status, plan, etc.)
+    const fullUser = await prisma.user.findFirst({
+      where: { email },
+    });
+
+    if (!fullUser) {
+      console.log('❌ User not found when fetching full user object:', email);
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has proper status to login
+    // Using type assertion to safely access status field that might not exist in all databases
+    const userWithStatus = fullUser as any;
+    if (userWithStatus.status && userWithStatus.status !== 'ACTIVE') {
+      console.log('❌ User has wrong status:', userWithStatus.status, 'for user:', email);
+      if (userWithStatus.status === 'INVITED') {
+        return NextResponse.json(
+          { error: 'Please set your password using the invite link sent to your email' },
+          { status: 403 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: 'Account not activated' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Additional security check: Ensure user has a valid plan if the field exists
+    // Using type assertion to safely access plan field that might not exist in all databases
+    const userWithPlan = fullUser as any;
+    if (userWithPlan.plan === null || userWithPlan.plan === undefined) {
+      console.log('❌ User has no plan assigned:', email);
+      return NextResponse.json(
+        { error: 'Account not properly configured - no plan assigned' },
+        { status: 401 }
+      );
+    }
+
+    // Guard: User must be active
+    if (!fullUser.active) {
+      console.log('❌ User is not active:', email);
+      return NextResponse.json(
+        { error: 'Account not activated' },
+        { status: 403 }
+      );
+    }
+
     // Guard: User has no password (null or undefined)
-    if (!user.password || user.password.trim() === '') {
+    if (!fullUser || !fullUser.password || fullUser.password.trim() === '') {
       console.log('❌ User has no password:', email);
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -51,7 +219,7 @@ export async function POST(request: Request) {
     // Guard: bcrypt comparison with try/catch to prevent crash
     let isValid = false;
     try {
-      isValid = await bcrypt.compare(password, user.password);
+      isValid = await bcrypt.compare(password, fullUser.password);
     } catch (bcryptError) {
       console.error('❌ bcrypt error:', bcryptError);
       return NextResponse.json(
@@ -71,7 +239,7 @@ export async function POST(request: Request) {
     // Update last login
     try {
       await prisma.user.update({
-        where: { id: user.id },
+        where: { id: fullUser.id },
         data: { lastLogin: new Date() },
       });
     } catch (updateError) {
@@ -80,23 +248,39 @@ export async function POST(request: Request) {
     }
 
     // Guard: JWT secret must exist
-    const jwtSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+    let jwtSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
     if (!jwtSecret) {
       console.error('❌ CRITICAL: JWT_SECRET or NEXTAUTH_SECRET is not configured');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      
+      // Use a fallback secret for development (not recommended for production)
+      if (process.env.NODE_ENV !== 'production') {
+        jwtSecret = 'fallback-jwt-secret-key-change-me-in-production';
+        console.warn('⚠️ Using fallback JWT secret - this should only be used in development');
+      } else {
+        return NextResponse.json(
+          { error: 'Server configuration error - JWT secret not configured' },
+          { status: 500 }
+        );
+      }
     }
 
     // Create session token with try/catch
     let token: string;
     try {
+      if (!fullUser) {
+        console.error('❌ No user object available for token creation');
+        return NextResponse.json(
+          { error: 'Authentication error' },
+          { status: 500 }
+        );
+      }
       token = jwt.sign(
         {
-          userId: user.id,
-          email: user.email,
-          role: user.role,
+          userId: fullUser.id,
+          email: fullUser.email,
+          role: fullUser.role,
+          plan: (fullUser as any)?.plan || (fullUser.name?.includes('(monthly)') ? 'MONTHLY' : fullUser.name?.includes('(annual)') ? 'ANNUAL' : null), // Include plan information
+          hasValidSubscription: !!(fullUser as any).plan, // For USER role, check if plan exists
         },
         jwtSecret,
         { expiresIn: '7d' }
@@ -110,12 +294,21 @@ export async function POST(request: Request) {
     }
 
     // Create response with user data
+    if (!fullUser) {
+      console.error('❌ No user object available for response');
+      return NextResponse.json(
+        { error: 'Authentication error' },
+        { status: 500 }
+      );
+    }
     const response = NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+        id: fullUser.id,
+        email: fullUser.email,
+        name: fullUser.name,
+        role: fullUser.role,
+        plan: (fullUser as any)?.plan || (fullUser.name?.includes('(monthly)') ? 'MONTHLY' : fullUser.name?.includes('(annual)') ? 'ANNUAL' : null), // Include plan information
+        hasValidSubscription: !!(fullUser as any).plan, // For USER role, check if plan exists
       },
     });
 
@@ -124,8 +317,8 @@ export async function POST(request: Request) {
       name: 'auth_token',
       value: token,
       httpOnly: true,
-      secure: true,        // MUST be true on Vercel
-      sameSite: 'none',    // REQUIRED for Edge + redirects
+      secure: process.env.NODE_ENV === 'production', // Only secure in production
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for production, 'lax' for development
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
@@ -138,7 +331,7 @@ export async function POST(request: Request) {
     console.error('❌ Login error (FULL):', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
     console.error('Error message:', error instanceof Error ? error.message : String(error));
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
