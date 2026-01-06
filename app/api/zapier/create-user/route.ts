@@ -30,6 +30,10 @@ const PRODUCT_PLAN_MAPPING: Record<string, string> = {
 export async function POST(request: Request) {
   try {
     console.log('📥 Zapier webhook received');
+    
+    // Log headers and body for debugging
+    const headers = Object.fromEntries(request.headers.entries());
+    console.log('Headers:', headers);
 
     // 1. Verify Zapier secret from Authorization header
     // This is CRITICAL - prevents unauthorized access to create users
@@ -53,15 +57,44 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Parse and validate payload
-    const body = await request.json();
-    const { email, first_name, last_name, product_id } = body;
+    // 2. Parse payload based on content type
+    let body;
+    const contentType = request.headers.get('content-type');
+    
+    if (contentType?.includes('application/x-www-form-urlencoded')) {
+      console.log('Parsing as form URL-encoded data');
+      const formData = await request.formData();
+      body = Object.fromEntries(formData);
+      console.log('Form data body:', body);
+    } else {
+      console.log('Parsing as JSON data');
+      body = await request.json();
+      console.log('JSON body:', body);
+    }
+
+    // Extract fields (handle both possible field names)
+    const email = body.email || body.Email;
+    const firstName = body.firstName || body.first_name || body.FirstName;
+    const lastName = body.lastName || body.last_name || body.LastName;
+    const product_id = body.product_id || body.productId || body.ProductId;
 
     // Validate required fields
-    if (!email || !first_name || !last_name || !product_id) {
-      console.log('❌ Missing required fields:', { email: !!email, first_name: !!first_name, last_name: !!last_name, product_id: !!product_id });
+    if (!email || !firstName || !lastName || !product_id) {
+      console.log('❌ Missing required fields:', {
+        email: !!email,
+        firstName: !!firstName,
+        lastName: !!lastName,
+        product_id: !!product_id
+      });
+      
+      const missingFields = [];
+      if (!email) missingFields.push('email');
+      if (!firstName) missingFields.push('firstName');
+      if (!lastName) missingFields.push('lastName');
+      if (!product_id) missingFields.push('product_id');
+      
       return NextResponse.json(
-        { error: 'Missing required fields: email, first_name, last_name, product_id' },
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
         { status: 400 }
       );
     }
@@ -87,9 +120,18 @@ export async function POST(request: Request) {
     }
 
     // 4. Check if user already exists
-    let existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    let existingUser;
+    try {
+      existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+    } catch (error) {
+      console.error('❌ Error finding user:', error);
+      return NextResponse.json(
+        { error: 'Database error occurred while finding user' },
+        { status: 400 }
+      );
+    }
 
     if (existingUser) {
       // If user is already active, return success (idempotent operation)
@@ -110,22 +152,39 @@ export async function POST(request: Request) {
         const tokenExpiryHours = parseInt(process.env.INVITE_TOKEN_EXPIRY_HOURS || '24');
         const inviteExpiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
 
-        const updatedUser = await prisma.user.update({
-          where: { email },
-          data: {
-            plan: plan as any, // Type assertion since Prisma enum matches
-            active: false, // User is not active until they set password
-            status: 'INVITED', // Set status to invited
-            inviteToken: newInviteToken, // Store the invite token
-            inviteExpiresAt, // Store expiry time
-          } as any,
-        });
+        let updatedUser;
+        try {
+          updatedUser = await prisma.user.update({
+            where: { email },
+            data: {
+              plan: plan as any, // Type assertion since Prisma enum matches
+              active: false, // User is not active until they set password
+              status: 'INVITED', // Set status to invited
+              inviteToken: newInviteToken, // Store the invite token
+              inviteExpiresAt, // Store expiry time
+            } as any,
+          });
+        } catch (error: any) {
+          // Handle Prisma errors safely - if user already exists, return 200 (idempotent)
+          if (error.code === 'P2002') { // Unique constraint violation
+            console.log('✅ User already exists with different email', email);
+            return NextResponse.json({
+              message: 'User already exists',
+              user: { id: existingUser.id, email: existingUser.email }
+            });
+          }
+          console.error('❌ Error updating user:', error);
+          return NextResponse.json(
+            { error: 'Database error occurred while updating user' },
+            { status: 400 }
+          );
+        }
 
         // Send new invite email
         try {
           await sendInviteEmail({
             email: updatedUser.email,
-            firstName: updatedUser.name?.split(' ')[0] || first_name,
+            firstName: updatedUser.name?.split(' ')[0] || firstName,
             token: newInviteToken,
           });
         } catch (emailError) {
@@ -146,26 +205,47 @@ export async function POST(request: Request) {
     const tokenExpiryHours = parseInt(process.env.INVITE_TOKEN_EXPIRY_HOURS || '24');
     const inviteExpiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
 
-    const fullName = `${first_name} ${last_name}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
 
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        name: fullName,
-        plan: plan as any, // Type assertion since Prisma enum matches
-        active: false, // User starts as inactive (no password yet)
-        status: 'INVITED', // User starts as invited (no password yet)
-        inviteToken, // Store the invite token
-        inviteExpiresAt, // Store expiry time
-        // password remains null until user sets it
-      } as any,
-    });
+    let newUser;
+    try {
+      newUser = await prisma.user.create({
+        data: {
+          email,
+          name: fullName,
+          plan: plan as any, // Type assertion since Prisma enum matches
+          active: false, // User starts as inactive (no password yet)
+          status: 'INVITED', // User starts as invited (no password yet)
+          inviteToken, // Store the invite token
+          inviteExpiresAt, // Store expiry time
+          // password remains null until user sets it
+        } as any,
+      });
+    } catch (error: any) {
+      // Handle Prisma errors safely - if user already exists, return 200 (idempotent)
+      if (error.code === 'P2002') { // Unique constraint violation
+        console.log('✅ User already exists with email:', email);
+        // Find the existing user to return
+        const existingUser = await prisma.user.findUnique({
+          where: { email },
+        });
+        return NextResponse.json({
+          message: 'User already exists',
+          user: { id: existingUser?.id, email: existingUser?.email }
+        });
+      }
+      console.error('❌ Error creating user:', error);
+      return NextResponse.json(
+        { error: 'Database error occurred while creating user' },
+        { status: 400 }
+      );
+    }
 
     // Send invite email with secure link
     try {
       await sendInviteEmail({
         email: newUser.email,
-        firstName: first_name,
+        firstName: firstName,
         token: inviteToken,
       });
     } catch (emailError) {
@@ -179,7 +259,7 @@ export async function POST(request: Request) {
     try {
       await sendInviteEmail({
         email: newUser.email,
-        firstName: first_name,
+        firstName: firstName,
         token: inviteToken,
       });
     } catch (emailError) {
@@ -193,11 +273,14 @@ export async function POST(request: Request) {
       user: { id: newUser.id, email: newUser.email }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Zapier webhook error:', error);
+    // Temporarily return the caught error message in the response so we can see what is failing
+    // Goal: No 500 errors — only 200 / 400 responses
+    // For now, return error details to help debugging, but in production we might want to return a 400
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: error.message || 'Internal server error', stack: error.stack },
+      { status: 400 } // Changed from 500 to 400 as per requirement
     );
   }
 }
