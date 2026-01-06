@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     }
 
     // Extract fields (handle both possible field names)
-    const email = body.email || body.Email;
+    let email = body.email || body.Email;
     const firstName = body.firstName || body.first_name || body.FirstName;
     const lastName = body.lastName || body.last_name || body.LastName;
     const plan = body.plan || body.Plan;
@@ -102,6 +102,18 @@ export async function POST(request: Request) {
       console.log('❌ Invalid email format:', email);
       return NextResponse.json(
         { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    // Additional check: trim email to remove surrounding whitespace
+    email = email.trim();
+
+    // Final check: ensure email is properly formatted after trimming
+    if (!emailRegex.test(email)) {
+      console.log('❌ Trimmed email is still invalid:', email);
+      return NextResponse.json(
+        { error: 'Invalid email format after trimming' },
         { status: 400 }
       );
     }
