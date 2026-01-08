@@ -230,9 +230,14 @@ export async function POST(request: Request) {
           // Don't fail the request if email fails - user can still use the token
         }
 
+        // Generate invite link to return in response
+        const responseFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const responseInviteLink = `${responseFrontendUrl}/set-password?token=${newInviteToken}`;
+        
         return NextResponse.json({
           message: 'User invite regenerated successfully',
-          user: { id: updatedUser.id, email: updatedUser.email }
+          user: { id: updatedUser.id, email: updatedUser.email },
+          inviteLink: responseInviteLink // Include the invite link in the response
         });
       }
     }
@@ -324,9 +329,14 @@ export async function POST(request: Request) {
     }
 
     // 7. Return success response
+    // Generate invite link to return in response
+    const responseFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const responseInviteLink = `${responseFrontendUrl}/set-password?token=${inviteToken}`;
+    
     return NextResponse.json({
       message: 'User created successfully',
-      user: { id: newUser.id, email: newUser.email }
+      user: { id: newUser.id, email: newUser.email },
+      inviteLink: responseInviteLink // Include the invite link in the response
     });
 
   } catch (error: any) {
