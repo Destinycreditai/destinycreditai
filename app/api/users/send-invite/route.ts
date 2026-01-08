@@ -25,6 +25,21 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
+    
+    // Check if user already has an active invite token
+    if (user.inviteToken && user.inviteExpiresAt && new Date(user.inviteExpiresAt) > new Date()) {
+      console.log('⚠️ User already has an active invite token:', user.email);
+      
+      // Optionally, you could extend the existing token's expiry instead of creating a new one
+      // Or you could clear the existing token first
+      await prisma.user.update({
+        where: { email },
+        data: {
+          inviteToken: null,
+          inviteExpiresAt: null
+        }
+      });
+    }
 
     // Generate secure invite token
     const inviteToken = crypto.randomBytes(32).toString('hex');
