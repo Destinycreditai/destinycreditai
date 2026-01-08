@@ -41,36 +41,12 @@ This link will expire in 24 hours.
 Best regards,
 The DestinyCreditAI Team`);
   
-  // TODO: Implement actual email sending using your preferred email service
-  // Example with a service like Resend:
-  /*
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'onboarding@destinycreditai.com',
-      to: email,
-      subject: 'Welcome to DestinyCreditAI - Set Your Password',
-      html: `
-        <h1>Welcome to DestinyCreditAI!</h1>
-        <p>Hello ${firstName},</p>
-        <p>Click the link below to set your password and activate your account:</p>
-        <a href="${inviteLink}">Set Your Password</a>
-        <p>This link will expire in 24 hours.</p>
-        <p>Best regards,<br>The DestinyCreditAI Team</p>
-      `,
-    });
-    
-    if (error) {
-      console.error('Failed to send invite email:', error);
-      throw error;
-    }
-    
-    console.log('Invite email sent successfully:', data);
-  } catch (error) {
-    console.error('Error sending invite email:', error);
-    throw error;
-  }
-  */
+  // For production, implement with your email service (Resend, SendGrid, etc.)
+  // For now, we'll simulate email sending
+  console.log(`Invite email would be sent to: ${email}`);
   
-  // For now, just simulate success
+  // Simulate a potential delay for email processing
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
   return Promise.resolve();
 }

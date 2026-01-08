@@ -44,12 +44,17 @@ export async function POST(request: Request) {
     const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
     const inviteLink = `${frontendUrl}/set-password?token=${inviteToken}`;
 
-    // Send invite email
-    await sendInviteEmail({
-      email: user.email,
-      firstName: user.name?.split(' ')[0] || '',
-      token: inviteToken
-    });
+    // Send invite email (non-critical operation)
+    try {
+      await sendInviteEmail({
+        email: user.email,
+        firstName: user.name?.split(' ')[0] || '',
+        token: inviteToken
+      });
+    } catch (emailError) {
+      console.error('Failed to send invite email:', emailError);
+      // Don't fail the request if email fails - user can still use the token
+    }
 
     return NextResponse.json({
       success: true,
