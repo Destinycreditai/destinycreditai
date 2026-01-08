@@ -32,13 +32,15 @@ export async function POST(request: Request) {
     const inviteExpiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
 
     // Update user with invite token and expiry
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { email },
       data: {
         inviteToken,
         inviteExpiresAt
       }
     });
+    
+    console.log('✅ Invite token updated for user:', updatedUser.email, 'Token:', inviteToken);
 
     // Generate invite link
     const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';

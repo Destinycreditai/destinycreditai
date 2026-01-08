@@ -42,14 +42,18 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log('🔍 Looking for user with token:', token);
+    
     // Find user by invite token
     // Using type assertion since the Prisma client types may need refresh
     const user = await prisma.user.findFirst({
       where: {
         inviteToken: token,
-      } as any,
+      },
     });
-
+    
+    console.log('🔍 Found user:', user ? user.email : 'NULL');
+    
     if (!user) {
       console.log('❌ Invalid or expired token');
       return NextResponse.json(
@@ -59,8 +63,7 @@ export async function POST(request: Request) {
     }
 
     // Check if token is expired
-    const userWithToken = user as any;
-    if (userWithToken.inviteExpiresAt && new Date() > new Date(userWithToken.inviteExpiresAt)) {
+    if (user.inviteExpiresAt && new Date() > new Date(user.inviteExpiresAt)) {
       console.log('❌ Token has expired');
       return NextResponse.json(
         { error: 'Token has expired' },
@@ -72,7 +75,6 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
 
     // Update user: set password, activate account, clear token
-    // Using type assertion for the update operation
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
         status: 'ACTIVE', // Update status to active
         inviteToken: null, // Clear the invite token to prevent reuse
         inviteExpiresAt: null, // Clear expiry
-      } as any,
+      },
     });
 
     console.log('✅ Password set successfully for user:', user.email);
