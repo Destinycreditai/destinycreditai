@@ -187,7 +187,7 @@ export async function POST(request: Request) {
         
         // Generate and show the invite link in console
         const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-        const inviteLink = `${frontendUrl}/set-password?token=${newInviteToken}`
+        const inviteLink = `${frontendUrl}/set-password?token=${newInviteToken}`;
         console.log('📋 Invite link for user:', inviteLink);
 
         let updatedUser;
@@ -246,7 +246,7 @@ export async function POST(request: Request) {
 
         // Generate invite link to return in response
         const responseFrontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-        const responseInviteLink = `${responseFrontendUrl}/set-password?token=${newInviteToken}`
+        const responseInviteLink = `${responseFrontendUrl}/set-password?token=${newInviteToken}`;
         
         return NextResponse.json({
           message: 'User invite regenerated successfully',
@@ -264,7 +264,7 @@ export async function POST(request: Request) {
     
     // Generate and show the invite link in console
     const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-    const inviteLink = `${frontendUrl}/set-password?token=${inviteToken}`
+    const inviteLink = `${frontendUrl}/set-password?token=${inviteToken}`;
     console.log('📋 Invite link for user:', inviteLink);
 
     const fullName = `${firstName} ${lastName}`.trim();
@@ -346,7 +346,7 @@ export async function POST(request: Request) {
     // 7. Return success response
     // Generate invite link to return in response
     const responseFrontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-    const responseInviteLink = `${responseFrontendUrl}/set-password?token=${inviteToken}`
+    const responseInviteLink = `${responseFrontendUrl}/set-password?token=${inviteToken}`;
     
     return NextResponse.json({
       message: 'User created successfully',
