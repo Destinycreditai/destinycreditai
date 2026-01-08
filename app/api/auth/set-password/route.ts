@@ -79,6 +79,32 @@ export async function POST(request: Request) {
     
     if (!user) {
       console.log('❌ Invalid or expired token');
+      
+      // Check if token exists in another format (e.g., trimmed or different encoding)
+      const allUsers = await prisma.user.findMany({
+        where: {
+          inviteToken: { not: null },
+        },
+        select: {
+          email: true,
+          inviteToken: true,
+          inviteExpiresAt: true,
+        },
+      });
+      
+      const matchingToken = allUsers.find((u: any) => 
+        u.inviteToken === token || 
+        u.inviteToken?.trim() === token.trim()
+      );
+      
+      if (matchingToken) {
+        console.log('⚠️ Token found but possibly mismatch due to format - stored for user:', matchingToken.email);
+        return NextResponse.json(
+          { error: 'Token validation issue - please try the link from your email again' },
+          { status: 400 }
+        );
+      }
+      
       return NextResponse.json(
         { error: 'Invalid or expired token' },
         { status: 400 }
