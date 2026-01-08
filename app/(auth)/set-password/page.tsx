@@ -2,6 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
+// Prevent Next.js from attempting to prerender this page during build
+export const revalidate = 0;
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -77,6 +80,19 @@ export default function SetPasswordPage() {
             setLoading(false);
         }
     };
+
+    // Server-side guard to ensure this page runs client-side only
+    if (typeof window === 'undefined') {
+        return (
+            <div className="min-h-screen bg-pure-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+                <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                    <h2 className="mt-6 text-center text-3xl font-extrabold text-primary-black">
+                        Loading...
+                    </h2>
+                </div>
+            </div>
+        );
+    }
 
     if (error && !token) {
         return (
