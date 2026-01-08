@@ -13,28 +13,18 @@ model User {
   email           String           @unique
   password        String?
   role            Role             @default(USER)
-  active          Boolean          @default(true)  // Keep for backward compatibility
-  plan            Plan?            // monthly | annual
-  status          UserStatus       @default(REGISTERED)  // invited | active | registered
-  inviteToken     String?          // for initial password setup
-  inviteExpiresAt DateTime?        // when invite token expires
+  active          Boolean          @default(true)
   lastLogin       DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  inviteToken     String?
+  inviteExpiresAt DateTime?
+  productName     String?          // from Kartra
+  productId       String?          // from Kartra
+  status          UserStatus       @default(REGISTERED)
   letters         CreditLetter[]
   followUps       FollowUpLetter[]
   uploads         UploadedFile[]
-}
-
-enum Plan {
-  MONTHLY
-  ANNUAL
-}
-
-enum UserStatus {
-  REGISTERED  // initial status when created via Zapier
-  INVITED     // when invite token generated
-  ACTIVE      // when user sets password and activates account
 }
 
 model CreditLetter {
@@ -116,6 +106,17 @@ model LetterTemplate {
   content    String
   disclaimer String?
   enabled    Boolean @default(true)
+}
+
+enum Plan {
+  MONTHLY
+  ANNUAL
+}
+
+enum UserStatus {
+  REGISTERED
+  INVITED
+  ACTIVE
 }
 
 enum Role {
