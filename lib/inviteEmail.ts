@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 /**
  * Helper function to send invite emails to new users
@@ -43,21 +43,15 @@ This link will expire in 24 hours.
 Best regards,
 The DestinyCreditAI Team`);
   
-  // Use nodemailer to send email via Mailtrap for testing
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: parseInt(process.env.SMTP_PORT || '2525'),
-    auth: {
-      user: process.env.SMTP_USER || '21a3741be42aed',
-      pass: process.env.SMTP_PASS || 'a4d519e45136ad'
-    }
-  });
+  // Use Resend to send email
+  const resend = new Resend(process.env.RESEND_API_KEY);
   
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || 'onboarding@destinycreditai.com',
-    to: email,
-    subject: 'Welcome to DestinyCreditAI - Set Your Password',
-    html: `<!DOCTYPE html>
+  try {
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'onboarding@destinycreditai.com',
+      to: [email],
+      subject: 'Welcome to Destiny Credit AI 🎉 - Create Your Password & Get Started',
+      html: `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -161,11 +155,14 @@ The DestinyCreditAI Team`);
   </div>
 </body>
 </html>`
-  };
-  
-  try {
-    const result = await transporter.sendMail(mailOptions);
-    console.log('Invite email sent successfully:', result.messageId);
+    });
+    
+    if (error) {
+      console.error('Failed to send invite email:', error);
+      throw error;
+    }
+    
+    console.log('Invite email sent successfully:', data?.id);
   } catch (error) {
     console.error('Failed to send invite email:', error);
     throw error;
