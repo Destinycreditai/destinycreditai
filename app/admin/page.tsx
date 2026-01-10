@@ -93,6 +93,12 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentAdminPassword, setCurrentAdminPassword] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [adminToDelete, setAdminToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -318,6 +324,88 @@ export default function AdminPanel() {
     }
   };
 
+  const changeAdminPassword = async () => {
+    if (newAdminPassword !== confirmNewPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    
+    if (newAdminPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: currentAdminPassword,
+          newPassword: newAdminPassword
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        alert('✅ Password updated successfully!');
+        setShowChangePasswordModal(false);
+        setCurrentAdminPassword('');
+        setNewAdminPassword('');
+        setConfirmNewPassword('');
+        setPasswordError('');
+      } else {
+        setPasswordError(result.error || 'Failed to update password');
+      }
+    } catch (err) {
+      setPasswordError('Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const checkAdminCount = async () => {
+    const adminUsers = users.filter(user => user.role === 'ADMIN');
+    return adminUsers.length;
+  };
+  
+  const deleteAdmin = async (adminId: string) => {
+    setLoading(true);
+    try {
+      const adminCount = await checkAdminCount();
+      if (adminCount <= 1) {
+        alert('❌ Cannot delete the last admin. At least one admin must remain.');
+        setAdminToDelete(null);
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch(`/api/admin/users/${adminId}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        alert('✅ Admin deleted successfully!');
+        await fetchData();
+        setAdminToDelete(null);
+        // Redirect to login if we deleted ourselves
+        if (adminId === localStorage.getItem('currentUserId')) {
+          await fetch('/api/auth/logout', { method: 'POST' });
+          window.location.href = '/login';
+        }
+      } else {
+        alert('❌ Failed to delete admin: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('❌ Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const sections = [
     { id: 'users', name: '👥 Users' },
     { id: 'letters', name: '📄 Credit Letters' },
@@ -330,6 +418,7 @@ export default function AdminPanel() {
     { id: 'guidance-video', name: '📺 Guidance Video' },
     // { id: 'uploads', name: '📁 Uploaded Files' },
     { id: 'activity', name: '📈 System Activity' },
+    { id: 'admin-management', name: '🛡️ Admin Management' },
   ];
 
   return (
@@ -876,6 +965,145 @@ export default function AdminPanel() {
                   </table>
                 </div>
               )}
+
+              {/* Admin Management Section */}
+              {activeSection === 'admin-management' && (
+                <div className="space-y-6">
+                  <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                    <h3 className="text-xl font-semibold text-blue-800 mb-4">Create New Admin Account</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        placeholder="Admin Name"
+                        className="w-full p-3 border rounded-lg"
+                        id="admin-name"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Admin Email"
+                        className="w-full p-3 border rounded-lg"
+                        id="admin-email"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Admin Password"
+                        className="w-full p-3 border rounded-lg"
+                        id="admin-password"
+                      />
+                      <select
+                        value="ADMIN"
+                        className="w-full p-3 border rounded-lg bg-white"
+                        disabled
+                      >
+                        <option value="ADMIN">Administrator</option>
+                      </select>
+                      <button
+                        onClick={async () => {
+                          const name = (document.getElementById('admin-name') as HTMLInputElement)?.value;
+                          const email = (document.getElementById('admin-email') as HTMLInputElement)?.value;
+                          const password = (document.getElementById('admin-password') as HTMLInputElement)?.value;
+                          
+                          if (!name || !email || !password) {
+                            alert('Please fill all fields');
+                            return;
+                          }
+                          
+                          // Validate email format
+                          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                          if (!emailRegex.test(email)) {
+                            alert('Please enter a valid email address');
+                            return;
+                          }
+                          
+                          // Check if user already exists
+                          const existingUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+                          if (existingUser) {
+                            alert('A user with this email already exists');
+                            return;
+                          }
+                          
+                          await saveRecord('users', {
+                            name,
+                            email,
+                            password,
+                            role: 'ADMIN'
+                          });
+                        }}
+                        className="col-span-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded-lg"
+                      >
+                        Create Admin Account
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-semibold text-gray-800">Manage Admin Accounts</h3>
+                      <button
+                        onClick={() => setShowChangePasswordModal(true)}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-4 py-2 rounded-lg"
+                      >
+                        Change My Password
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Created</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {users.filter(user => user.role === 'ADMIN').map((admin) => (
+                            <tr key={admin.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{admin.name || 'No Name'}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{admin.email}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${admin.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                  {admin.active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(admin.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <button
+                                  onClick={() => setEditingItem({ type: 'users', data: admin })}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 rounded"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const adminCount = users.filter(u => u.role === 'ADMIN').length;
+                                    if (adminCount <= 1) {
+                                      alert('Cannot delete the last admin. At least one admin must remain.');
+                                    } else {
+                                      if (confirm('Are you sure you want to delete this admin? This action cannot be undone.')) {
+                                        deleteAdmin(admin.id);
+                                      }
+                                    }
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1 rounded"
+                                  disabled={users.filter(u => u.role === 'ADMIN').length <= 1}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -890,9 +1118,65 @@ export default function AdminPanel() {
               <EditForm
                 type={editingItem.type}
                 data={editingItem.data}
+                users={users}
                 onSave={saveRecord}
                 onCancel={() => setEditingItem(null)}
               />
+            </div>
+          </div>
+        )}
+        
+        {/* Change Password Modal */}
+        {showChangePasswordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white p-6 rounded-lg w-full max-w-md">
+              <h3 className="text-lg font-semibold mb-4 text-black">Change Your Password</h3>
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  placeholder="Current Password"
+                  value={currentAdminPassword}
+                  onChange={(e) => setCurrentAdminPassword(e.target.value)}
+                  className="w-full p-3 border rounded-lg"
+                />
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  className="w-full p-3 border rounded-lg"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm New Password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="w-full p-3 border rounded-lg"
+                />
+                {passwordError && (
+                  <div className="text-red-600 text-sm">{passwordError}</div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={changeAdminPassword}
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex-1"
+                  >
+                    Update Password
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowChangePasswordModal(false);
+                      setCurrentAdminPassword('');
+                      setNewAdminPassword('');
+                      setConfirmNewPassword('');
+                      setPasswordError('');
+                    }}
+                    className="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg flex-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -901,7 +1185,7 @@ export default function AdminPanel() {
   );
 }
 
-function EditForm({ type, data, onSave, onCancel }: any) {
+function EditForm({ type, data, users, onSave, onCancel }: any) {
   // Initialize formData with proper defaults for video types
   const getInitialFormData = () => {
     const baseData = { ...data };
@@ -933,6 +1217,25 @@ function EditForm({ type, data, onSave, onCancel }: any) {
           alert('❌ Invalid JSON in steps field. Please fix the JSON format.');
           return;
         }
+      }
+    }
+    
+    // Email validation for user creation/editing
+    if (type === 'users' && formData.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        alert('Please enter a valid email address');
+        return;
+      }
+      
+      // Check if user already exists (except when editing existing user)
+      const existingUser = users.find((u: any) => 
+        u.email.toLowerCase() === formData.email.toLowerCase() && 
+        (!formData.id || u.id !== formData.id) // Skip check for current user being edited
+      );
+      if (existingUser) {
+        alert('A user with this email already exists');
+        return;
       }
     }
 
