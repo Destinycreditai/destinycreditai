@@ -48,7 +48,7 @@ The DestinyCreditAI Team`);
   
   try {
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@destinycreditai.com',
+      from: process.env.EMAIL_FROM || 'info@shakehandswithdestiny.com',
       to: [email],
       subject: 'Welcome to Destiny Credit AI 🎉 - Create Your Password & Get Started',
       html: `<!DOCTYPE html>
