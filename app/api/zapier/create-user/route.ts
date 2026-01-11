@@ -180,79 +180,132 @@ export async function POST(request: Request) {
       if (!existingUser.active || (existingUser as any).status !== 'ACTIVE') { // User is not active, so we'll update them
         console.log('🔄 Updating existing user:', email);
         
-        // Generate new secure invite token
-        const newInviteToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiryHours = parseInt(process.env.INVITE_TOKEN_EXPIRY_HOURS || '24');
-        const inviteExpiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
-        
-        // Generate and show the invite link in console
-        const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-        const inviteLink = `${frontendUrl}/set-password?token=${newInviteToken}`;
-        console.log('📋 Invite link for user:', inviteLink);
-
-        let updatedUser;
-        try {
-          updatedUser = await prisma.user.update({
-            where: { email },
-            data: {
-              productName: productName as string, // Store product name
-              productId: productId as string, // Store product ID
-              active: false, // User is not active until they set password
-              status: 'INVITED', // Set status to invited
-              inviteToken: newInviteToken, // Store the invite token
-              inviteExpiresAt, // Store expiry time
-            } as any,
-          });
-        } catch (error: any) {
-          console.error('❌ Error updating user:', error);
+        // Check if user already has an active unused invite token
+        const existingUserTyped = existingUser as any; // Include inviteUsed property
+        if (existingUser.inviteToken && existingUser.inviteExpiresAt && !existingUserTyped.inviteUsed && new Date(existingUser.inviteExpiresAt) > new Date()) {
+          console.log('⚠️ User already has an active unused invite token:', email);
           
-          // Handle Prisma errors safely - if user already exists, return 200 (idempotent)
-          if (error.code === 'P2002') { // Unique constraint violation
-            console.log('✅ User already exists with email', email);
-            return NextResponse.json({
-              message: 'User already exists',
-              user: { id: existingUser.id, email: existingUser.email }
+          // Do NOT generate a new token - reuse the existing one
+          // Just update product info and send a new email with the existing token
+          let updatedUser;
+          try {
+            updatedUser = await prisma.user.update({
+              where: { email },
+              data: {
+                productName: productName as string, // Store product name
+                productId: productId as string, // Store product ID
+                active: false, // User is not active until they set password
+                status: 'INVITED', // Set status to invited
+                // Keep existing invite token
+              } as any,
             });
+            
+            // Send new invite email with existing token
+            try {
+              await sendInviteEmail({
+                email: updatedUser.email,
+                firstName: updatedUser.name?.split(' ')[0] || firstName,
+                token: existingUser.inviteToken,
+              });
+            } catch (emailError) {
+              console.error('❌ Failed to send invite email:', emailError);
+              // Don't fail the request if email fails - user can still use the token
+            }
+            
+            // Generate invite link to return in response
+            const responseFrontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
+            const responseInviteLink = `${responseFrontendUrl}/set-password?token=${existingUser.inviteToken}`;
+            
+            return NextResponse.json({
+              message: 'User invite regenerated successfully',
+              user: { id: updatedUser.id, email: updatedUser.email },
+              inviteLink: responseInviteLink // Include the invite link in the response
+            });
+          } catch (updateError: any) {
+            console.error('❌ Error updating user with existing token:', updateError);
+            return NextResponse.json(
+              { 
+                error: 'Database error occurred while updating user',
+                message: updateError.message
+              },
+              { status: 400 }
+            );
           }
+        } else {
+          // Generate new secure invite token
+          const newInviteToken = crypto.randomBytes(32).toString('hex');
+          const tokenExpiryHours = parseInt(process.env.INVITE_TOKEN_EXPIRY_HOURS || '24');
+          const inviteExpiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
           
-          // More detailed error reporting for debugging
-          console.error('Prisma update error details:', {
-            code: error.code,
-            meta: error.meta,
-            message: error.message
-          });
-          
-          return NextResponse.json(
-            { 
-              error: 'Database error occurred while updating user',
-              details: error.code ? `Error code: ${error.code}` : 'Unknown database error',
+          // Generate and show the invite link in console
+          const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
+          const inviteLink = `${frontendUrl}/set-password?token=${newInviteToken}`;
+          console.log('📋 Invite link for user:', inviteLink);
+
+          let updatedUser;
+          try {
+            updatedUser = await prisma.user.update({
+              where: { email },
+              data: {
+                productName: productName as string, // Store product name
+                productId: productId as string, // Store product ID
+                active: false, // User is not active until they set password
+                status: 'INVITED', // Set status to invited
+                inviteToken: newInviteToken, // Store the invite token
+                inviteExpiresAt, // Store expiry time
+              } as any,
+            });
+            
+            // Send new invite email
+            try {
+              await sendInviteEmail({
+                email: updatedUser.email,
+                firstName: updatedUser.name?.split(' ')[0] || firstName,
+                token: newInviteToken,
+              });
+            } catch (emailError) {
+              console.error('❌ Failed to send invite email:', emailError);
+              // Don't fail the request if email fails - user can still use the token
+            }
+            
+            // Generate invite link to return in response
+            const responseFrontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
+            const responseInviteLink = `${responseFrontendUrl}/set-password?token=${newInviteToken}`;
+            
+            return NextResponse.json({
+              message: 'User invite regenerated successfully',
+              user: { id: updatedUser.id, email: updatedUser.email },
+              inviteLink: responseInviteLink // Include the invite link in the response
+            });
+          } catch (error: any) {
+            console.error('❌ Error updating user:', error);
+            
+            // Handle Prisma errors safely - if user already exists, return 200 (idempotent)
+            if (error.code === 'P2002') { // Unique constraint violation
+              console.log('✅ User already exists with email', email);
+              return NextResponse.json({
+                message: 'User already exists',
+                user: { id: existingUser.id, email: existingUser.email }
+              });
+            }
+            
+            // More detailed error reporting for debugging
+            console.error('Prisma update error details:', {
+              code: error.code,
+              meta: error.meta,
               message: error.message
-            },
-            { status: 400 }
-          );
+            });
+            
+            return NextResponse.json(
+              { 
+                error: 'Database error occurred while updating user',
+                details: error.code ? `Error code: ${error.code}` : 'Unknown database error',
+                message: error.message
+              },
+              { status: 400 }
+            );
+          }
         }
-
-        // Send new invite email
-        try {
-          await sendInviteEmail({
-            email: updatedUser.email,
-            firstName: updatedUser.name?.split(' ')[0] || firstName,
-            token: newInviteToken,
-          });
-        } catch (emailError) {
-          console.error('❌ Failed to send invite email:', emailError);
-          // Don't fail the request if email fails - user can still use the token
-        }
-
-        // Generate invite link to return in response
-        const responseFrontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
-        const responseInviteLink = `${responseFrontendUrl}/set-password?token=${newInviteToken}`;
-        
-        return NextResponse.json({
-          message: 'User invite regenerated successfully',
-          user: { id: updatedUser.id, email: updatedUser.email },
-          inviteLink: responseInviteLink // Include the invite link in the response
-        });
       }
     }
 

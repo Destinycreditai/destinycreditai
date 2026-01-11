@@ -136,16 +136,19 @@ export async function POST(request: Request) {
     // Hash the new password
     const hashedPassword = await hashPassword(password);
 
-    // Update user: set password, activate account, clear token
+    // Update user: set password, activate account, clear token and mark as used
+    const updateData: any = {
+      password: hashedPassword,
+      active: true, // User is now active
+      status: 'ACTIVE', // Update status to active
+      inviteToken: null, // Clear the invite token to prevent reuse
+      inviteExpiresAt: null, // Clear expiry
+      inviteUsed: true, // Mark token as used
+    };
+    
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        active: true, // User is now active
-        status: 'ACTIVE', // Update status to active
-        inviteToken: null, // Clear the invite token to prevent reuse
-        inviteExpiresAt: null, // Clear expiry
-      },
+      data: updateData,
     });
 
     console.log('✅ Password set successfully for user:', user.email);

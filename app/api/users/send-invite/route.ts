@@ -26,18 +26,31 @@ export async function POST(request: Request) {
       );
     }
     
-    // Check if user already has an active invite token
-    if (user.inviteToken && user.inviteExpiresAt && new Date(user.inviteExpiresAt) > new Date()) {
-      console.log('⚠️ User already has an active invite token:', user.email);
+    // Check if user already has an active unused invite token
+    const userWithInviteUsed = user as any; // Temporary type assertion until migration is complete
+    if (user.inviteToken && user.inviteExpiresAt && !(userWithInviteUsed.inviteUsed) && new Date(user.inviteExpiresAt) > new Date()) {
+      console.log('⚠️ User already has an active unused invite token:', user.email);
       
-      // Optionally, you could extend the existing token's expiry instead of creating a new one
-      // Or you could clear the existing token first
-      await prisma.user.update({
-        where: { email },
-        data: {
-          inviteToken: null,
-          inviteExpiresAt: null
-        }
+      // Do NOT generate a new token - reuse the existing one
+      // Just send a new email with the existing token
+      try {
+        await sendInviteEmail({
+          email: user.email,
+          firstName: user.name?.split(' ')[0] || '',
+          token: user.inviteToken
+        });
+      } catch (emailError) {
+        console.error('Failed to send invite email:', emailError);
+        // Don't fail the request if email fails - user can still use the token
+      }
+      
+      // Generate invite link to return in response
+      const frontendUrl = process.env.FRONTEND_URL || 'https://www.destinycreditai.com';
+      const inviteLink = `${frontendUrl}/set-password?token=${user.inviteToken}`;
+      
+      return NextResponse.json({
+        success: true,
+        inviteLink
       });
     }
 

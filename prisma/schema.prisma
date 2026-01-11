@@ -19,8 +19,8 @@ model User {
   updatedAt       DateTime         @updatedAt
   inviteToken     String?
   inviteExpiresAt DateTime?
-  productName     String?          // from Kartra
-  productId       String?          // from Kartra
+  productName     String?
+  productId       String?
   status          UserStatus       @default(REGISTERED)
   letters         CreditLetter[]
   followUps       FollowUpLetter[]
