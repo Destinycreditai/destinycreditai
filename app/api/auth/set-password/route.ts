@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
 
     // Update user: set password, activate account, clear token and mark as used
+    // Prepare update data with type assertion to handle the new field
     const updateData: any = {
       password: hashedPassword,
       active: true, // User is now active
@@ -149,6 +150,23 @@ export async function POST(request: Request) {
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: updateData,
+    }).catch(async (error) => {
+      // If the field doesn't exist yet, try without it
+      if (error.message.includes('inviteUsed') || error.message.includes('Unknown arg')) {
+        const fallbackUpdateData: any = {
+          password: hashedPassword,
+          active: true, // User is now active
+          status: 'ACTIVE', // Update status to active
+          inviteToken: null, // Clear the invite token to prevent reuse
+          inviteExpiresAt: null, // Clear expiry
+        };
+        
+        return await prisma.user.update({
+          where: { id: user.id },
+          data: fallbackUpdateData,
+        });
+      }
+      throw error;
     });
 
     console.log('✅ Password set successfully for user:', user.email);
